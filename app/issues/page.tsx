@@ -1,107 +1,54 @@
 import React from "react";
-import { Table } from "@radix-ui/themes";
 import prisma from "@/prisma/client";
-import { IssueStatusBadge, Link } from "@/app/components";
-import NextLink from "next/link";
 import IssueActions from "./IssueActions";
-import { Issue, Status } from "@prisma/client";
-import { ArrowUpIcon } from "@radix-ui/react-icons";
+import { Status } from "@prisma/client";
 import Pagination from "../components/Pagination";
+import IssueTable, { IssueQuery, columnNames } from "./IssueTable";
+import { Flex } from "@radix-ui/themes";
 
 interface Props {
-  searchParams: { status: Status; orderBy: keyof Issue; page: string };
+  searchParams: IssueQuery;
 }
 
 const IssuesPage = async ({ searchParams }: Props) => {
-  const columns: {
-    label: string;
-    value: keyof Issue;
-    className?: string;
-  }[] = [
-    { label: "Issue", value: "title" },
-    { label: "Status", value: "status", className: "hidden md:table-cell" },
-    { label: "Created", value: "createdAt", className: "hidden md:table-cell" },
-  ];
-
   const statuses = Object.values(Status);
-  const status = statuses.includes(searchParams.status)
+  const status = statuses.includes(searchParams.status) // Check if the status is valid
     ? searchParams.status
     : undefined;
 
   const where = { status };
 
-  const orderBy = columns
-    .map((column) => column.value)
-    .includes(searchParams.orderBy)
+  const orderBy = columnNames.includes(searchParams.orderBy) // Check if the orderBy parameter is valid
     ? { [searchParams.orderBy]: "asc" }
     : undefined;
 
-  const page = parseInt(searchParams.page) || 1;
+  const page = parseInt(searchParams.page) || 1; // Parse the page number from the query parameter
   const pageSize = 10;
 
   const issues = await prisma.issue.findMany({
+    // Fetch the issues
     where,
     orderBy,
     skip: (page - 1) * pageSize,
     take: pageSize,
   });
 
-  const issueCount = await prisma.issue.count({ where });
+  const issueCount = await prisma.issue.count({ where }); // Fetch the total number of issues by status
 
   return (
-    <div className="p-5">
+    <Flex direction={"column"} gap={"3"}>
       <IssueActions />
-      <Table.Root variant="surface">
-        <Table.Header>
-          <Table.Row>
-            {columns.map((column) => (
-              <Table.ColumnHeaderCell
-                key={column.value}
-                className={column.className}
-              >
-                <NextLink
-                  href={{
-                    query: { ...searchParams, orderBy: column.value },
-                  }}
-                >
-                  {column.label}
-                </NextLink>
-                {column.value === searchParams.orderBy && (
-                  <ArrowUpIcon className="inline" />
-                )}
-              </Table.ColumnHeaderCell>
-            ))}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {issues.map((issue) => (
-            <Table.Row key={issue.id}>
-              <Table.Cell>
-                <Link href={`/issues/${issue.id}`}>{issue.title}</Link>
-                <div className="block md:hidden">
-                  <IssueStatusBadge status={issue.status} />
-                </div>
-              </Table.Cell>
-              <Table.Cell className="hidden md:table-cell">
-                <IssueStatusBadge status={issue.status} />
-              </Table.Cell>
-              <Table.Cell className="hidden md:table-cell">
-                {issue.createdAt.toDateString()}
-              </Table.Cell>
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
+      <IssueTable searchParams={searchParams} issues={issues} />
       <Pagination
         pageSize={pageSize}
         currentPage={page}
         itemCount={issueCount}
       />
-    </div>
+    </Flex>
   );
 };
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // Force Next.js to always revalidate the page on each request
 //export const revalidate = 0;
 
 export default IssuesPage;
